@@ -13,6 +13,8 @@ export Important=1
 export Exhaustive=2
 export run_priority=$Exhaustive
 
+OSName=`uname -s`
+
 usage () {
     name=bbouncer
     echo "Usage: 
@@ -90,30 +92,54 @@ usage () {
 }
 
 read-tests () {
-    local testfiles=`ls tests.d/*.test`
+    local testfiles=`ls tests.$OSName.d/*.test`
     local tests=''
     for f in $testfiles; do
-        local tst=`basename -s .test $f`
+        if [ "$OSName" = "Darwin" ]; then
+            local tst=`basename -s .test $f`
+        else
+            local tst=`basename $f .test`
+        fi
         tests="$tests $tst"
     done
     echo $tests
 }
 
 read-copiers () {
-    local copyfiles=`ls copiers.d/*.cp`
+    local copyfiles=`ls copiers.$OSName.d/*.cp`
     local copiers=''
     for f in $copyfiles; do
-        local cpf=`basename -s .cp $f`
+        if [ "$OSName" = "Darwin" ]; then
+            local cpf=`basename -s .cp $f`
+        else
+            local cpf=`basename $f .cp`
+        fi
         copiers="$copiers $cpf"
     done
     echo $copiers
 }
 
 create-vol () {
-    hdiutil create -size 40m -fs 'Journaled HFS+' \
-            -volname $1 -type SPARSE ./$1
-    hdiutil attach -owners on ./$1.sparseimage
-    /usr/bin/which -s fsaclctl && sudo fsaclctl -p /Volumes/$1 -e
+    if [ "$OSName" = "Darwin" ]; then
+       hdiutil create -size 40m -fs 'Journaled HFS+' \
+               -volname $1 -type SPARSE ./$1
+       hdiutil attach -owners on ./$1.sparseimage
+       /usr/bin/which -s fsaclctl && sudo fsaclctl -p /Volumes/$1 -e
+    else
+       if [ -e /Volumes ]; then
+           touch /Volumes
+       else
+           mkdir /Volumes
+       fi
+       dd if=/dev/zero of=/Volumes/$1.ext3 count=256 bs=1024k > /dev/null
+       mkfs.ext3 -F /Volumes/$1.ext3 > /dev/null
+       if [ -e /Volumes/$1 ]; then
+           touch /Volumes/$1
+       else
+           mkdir /Volumes/$1
+       fi
+       mount -o loop -o user_xattr,acl /Volumes/$1.ext3 /Volumes/$1 
+    fi
     touch /Volumes/$1/bbouncer-vol
 }
 
@@ -133,7 +159,7 @@ clean () {
         tnice=$t
         printf "Cleaning: %${printWidth}s\n" "$tnice"
         if [ -d "$1/$t" ]; then
-            bash util/test-runner tests.d/$t.test clean $1/$t || true
+            /bin/bash util/test-runner tests.$OSName.d/$t.test clean $1/$t || true
             sudo rm -Rf "$1/$t" || true
         fi
     done
@@ -146,7 +172,7 @@ create () {
         tnice=$t
         printf "Creating: %${printWidth}s ... " "$tnice"
         mkdir $1/$t
-        bash util/test-runner tests.d/$t.test create $1/$t \
+        /bin/bash util/test-runner tests.$OSName.d/$t.test create $1/$t \
             && echo ok \
             || echo FAIL
     done
@@ -176,7 +202,7 @@ verify () {
             continue
         fi
         #printf "Verifying: %${printWidth}s ... " "$tnice"
-        bash util/test-runner tests.d/$t.test verify Verifying $tnice $dst/$t $src/$t 
+        /bin/bash util/test-runner tests.$OSName.d/$t.test verify Verifying $tnice $dst/$t $src/$t 
     done
 }
 
@@ -185,7 +211,7 @@ compare () {
     for t in $tests; do
         tnice=${t:3}
         #printf "Comparing: %${printWidth}s ... " "$tnice"
-        bash util/test-runner tests.d/$t.test compare Comparing $tnice $1 $2
+        /bin/bash util/test-runner tests.$OSName.d/$t.test compare Comparing $tnice $1 $2
     done
 }
 
@@ -199,11 +225,13 @@ copy () {
     echo "src = $src"
     echo "dst = $dst"
     # This requires the actual mount point.
-    local srcDisk=`stat -f "%Sd" $src`
-    local dstDisk=`stat -f "%Sd" $dst`
-    echo Enabling owners on src/dst disks
-    sudo mount -uvo perm /dev/$srcDisk
-    sudo mount -uvo perm /dev/$dstDisk
+    if [ "$OSName" = "Darwin" ]; then
+      local srcDisk=`stat -f "%Sd" $src`
+      local dstDisk=`stat -f "%Sd" $dst`
+      echo Enabling owners on $OSName src/dst disks
+      sudo mount -uvo perm /dev/$srcDisk
+      sudo mount -uvo perm /dev/$dstDisk
+    fi
     echo -n Cleaning
     # Always clean all tests -- we want to start fresh on a copy.
     oldtests="$tests"
@@ -219,7 +247,7 @@ copy () {
         cnice=${c:3}
         printf "Copying with: %${printWidth}s ... " "$cnice"
         mkdir $dst/$c
-        bash util/copy-runner copiers.d/$c.cp $src $dst/$c
+        /bin/bash util/copy-runner copiers.$OSName.d/$c.cp $src $dst/$c
         code=$?
         echo $code > $dst/$c/exit-code
         # Make sure the volume can be cleaned
@@ -246,9 +274,9 @@ test-set () {
     local tests
     case $1 in
         critical)
-            tests=`(cd tests.d; grep -l '##Critical##' *.test)`;;
+            tests=`(cd tests.$OSName.d; grep -l '##Critical##' *.test)`;;
         important)
-            tests=`(cd tests.d; grep -l '##Critical##\|##Important##' *.test)`;;
+            tests=`(cd tests.$OSName.d; grep -l '##Critical##\|##Important##' *.test)`;;
         *)
             echo Unknown test set: $1 >&2;;
     esac
@@ -269,16 +297,16 @@ while [ "${1:0:1}" = "-" ]; do
     case $opt in
         -d) export DETAIL=1;;
         -t)
-            if [ ! -f "tests.d/$1.test" ]; then
-                echo "No such test: tests.d/$1.test"
+            if [ ! -f "tests.$OSName.d/$1.test" ]; then
+                echo "No such test: tests.$OSName.d/$1.test"
                 exit 1
             fi
             tests="$tests $1"
             shift
             ;;
         -c)
-            if [ ! -f "copiers.d/$1.cp" ]; then
-                echo "No such copier: copiers.d/$1.cp"
+            if [ ! -f "copiers.$OSName.d/$1.cp" ]; then
+                echo "No such copier: copiers.$OSName.d/$1.cp"
                 exit 1
             fi
             copiers="$copiers $1"
