@@ -6,14 +6,35 @@
 
 int show_xattr(char *file, char *name)
 {
+#ifdef MACOS
     int options = XATTR_NOFOLLOW;
-    int size = getxattr(file, name, NULL, 0, 0, options);
+#endif
+
+    int size = getxattr(
+			file,
+			name,
+			NULL,
+			0
+#ifdef MACOS
+			,0,
+			options
+#endif
+			);
     if (size < 0) {
         return 0;
     }
     void *result = malloc(size);
     if (NULL != result) {
-        size_t read_size = getxattr(file, name, result, size, 0, options);
+        size_t read_size = getxattr(
+				file,
+				name,
+				result,
+				size
+#ifdef MACOS
+				,0,
+				options
+#endif
+				);
         if (read_size >= 0)  {
             write(1, result, read_size);
             free(result);
@@ -32,7 +53,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    int options = XATTR_NOFOLLOW;
+    int options = 0;
+#ifdef MACOS
+    options += XATTR_NOFOLLOW;
+#endif
+
     if (argv[1][0] == 'r') {
         /* Read mode */
         if (argc != 4) {
@@ -50,8 +75,16 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Wrong number of arguments\n");
             return 1;
         }
-        int code = setxattr(argv[4], argv[2], argv[3], strlen(argv[3])+1, 0,
-                            options);
+        int code = setxattr(
+			argv[4],
+			argv[2],
+			argv[3],
+			strlen(argv[3])+1,
+#ifdef MACOS
+			0,
+#endif
+			options
+			);
         if (code < 0) {
             perror(argv[0]);
             return 1;
@@ -63,7 +96,14 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Wrong number of arguments\n");
             return 1;
         }
-        size_t size = listxattr(argv[2], NULL, 0, options);
+        size_t size = listxattr(
+			argv[2],
+			NULL,
+			0
+#ifdef MACOS
+			,options
+#endif
+			);
         if (size == 0) {
             return 0;
         }
@@ -72,7 +112,14 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         char *buf = (char *)malloc(size);
-        size = listxattr(argv[2], buf, size, options);
+        size = listxattr(
+			argv[2],
+			buf,
+			size
+#ifdef MACOS
+			,options
+#endif
+			);
         if (size < 0) {
             perror(argv[0]);
             return 1;
@@ -89,7 +136,14 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Wrong number of arguments\n");
             return 1;
         }
-        size_t size = listxattr(argv[2], NULL, 0, options);
+        size_t size = listxattr(
+			argv[2],
+			NULL,
+			0
+#ifdef MACOS
+			,options
+#endif
+			);
         if (size == 0) {
             return 0;
         }
@@ -98,13 +152,19 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         char *buf = (char *)malloc(size);
-        size = listxattr(argv[2], buf, size, options);
+        size = listxattr(
+			argv[2],
+			buf,
+			size
+#ifdef MACOS
+			,options
+#endif
+			);
         if (size < 0) {
             perror(argv[0]);
             return 1;
         }
         char *end = buf + size;
-        void *value;
         while(buf < end) {
             printf("%s: \"", buf);
             fflush(stdout);
