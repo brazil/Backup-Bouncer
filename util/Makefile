@@ -1,4 +1,4 @@
-CFLAGS=-Wall -D$(OSFLAGS)
+CFLAGS=-D$(OSFLAGS) -g
 
 all: xattr-util hardlink-util
 

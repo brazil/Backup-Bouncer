@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# It looks like many techniques preserve most finder flags but not locks, so we
+# test them separately.
+#
+# Actually, this is equivalent to the uchg bsd flag!  Should this even be a
+# separate test?
+
+max_priority () {
+    echo $Exhaustive
+}
+
+create () {
+    cd $1
+    set -e
+    touch 'locked-file'
+    SetFile -a L locked-file
+}
+
+
+verify () {
+    cd $1
+    test "`GetFileInfo -al ./locked-file`" = "1"
+}
+
+clean () {
+    SetFile -a l locked-file
+}
+
+compare () {
+    test "`GetFileInfo -P -al $1`" = "`GetFileInfo -P -al $2`"
+}

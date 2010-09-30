@@ -1,0 +1,27 @@
+#!/bin/sh
+
+max_priority () {
+    echo $Exhaustive
+}
+
+create () {
+    cd $1
+    set -e
+    
+    mkfifo some-fifo
+}
+
+compare () {
+    test "`/usr/local/bin/stat --format='%F' $1`" = "`/usr/local/bin/stat --format='%F' $2`"
+}
+
+verify () {
+    cd $1
+    
+    test -p ./some-fifo \
+     && compare ./some-fifo $2/some-fifo
+}
+
+clean () {
+    true
+}

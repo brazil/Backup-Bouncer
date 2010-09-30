@@ -1,0 +1,56 @@
+#!/bin/sh
+
+max_priority () {
+    echo $Important
+}
+
+create () {
+    cd $1
+    set -e
+    
+    touch acl-test
+    icacls acl-test /grant hky:F /Q
+    icacls acl-test /grant Administrator:W /Q
+    icacls acl-test /deny Guests:W /Q
+    
+    mkdir acl-test-dir
+    icacls acl-test-dir /grant hky:W /Q
+    icacls acl-test-dir /grant Administrator:F /Q
+    
+    # Want these to be different from the symlink's target so we know
+    # we're getting the right thing.
+    #
+    # Ok, symlinks can't have acls
+    # ln -s ./acl-test acl-test-symlink
+    # setfacl -m u:nobody:r acl-test-symlink
+    # setfacl -m u:sshd:r acl-test-symlink
+}
+
+compare () {
+    test "`icacls $1 /Q`" = "`icacls $2 /Q`"
+}
+
+
+verify () {
+    cd $1
+    
+    begin-subtests
+    
+    compare $2/acl-test $1/acl-test
+    t1=$?
+    subtest "on files" $t1
+    
+    compare $2/acl-test-dir $1/acl-test-dir
+    t2=$?
+    subtest "on dirs" $t2
+    
+    # compare $2/acl-test-symlink $1/acl-test-symlink
+    # t3=$?
+    # subtest "on symlinks" $t3
+    
+    alltrue $t1 $t2
+}
+
+clean () {
+    true
+}

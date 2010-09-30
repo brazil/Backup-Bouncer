@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# There are a ton of these finder flags, and I'm not sure what the semantics are
+# for many of them.  Here's the SetFile help page:
+#
+# Usage: SetFile [option...] file...
+#     -a attributes   # attributes (lowercase = 0, uppercase = 1)*
+#     -c creator      # file creator
+#     -d date         # creation date (mm/dd/[yy]yy [hh:mm[:ss] [AM | PM]])*
+#     -m date         # modification date (mm/dd/[yy]yy [hh:mm[:ss] [AM | PM]])*
+#         -P          # perform action on symlink instead of following it
+#     -t type         # file type
+# 
+#     Note: The following attributes may be used with the -a option:
+#         A   Alias file
+#         B   Bundle
+#         C   Custom icon*
+#         D   Desktop*
+#         E   Hidden extension*
+#         I   Inited*
+#         M   Shared (can run multiple times)
+#         N   No INIT resources
+#         L   Locked
+#         S   System (name locked)
+#         T   Stationery
+#         V   Invisible*
+#         Z   Busy*
+# 
+#     Note: Items marked with an asterisk (*) are allowed with folders
+#     Note: Period (.) represents the current date and time.
+#     Note: [yy]yy < 100 assumes 21th century, e.g. 20yy
+#
+#
+# So what does it mean to assign the A attribute to some random file?
+#
+# Setting C (custom icon) on a folder means the finder will use the Icon^M file
+# inside that folder as its icon.
+#
+# I suppose the semantics don't really matter.  We just want to know if the
+# flags are preserved.
+
+max_priority () {
+    echo $Critical
+}
+
+create () {
+    cd $1
+    set -e
+    
+    touch type-and-creator
+    SetFile -c MSWD -t TEXT type-and-creator
+    
+    mkdir bundle-dir
+    touch bundle-dir/stuff
+    SetFile -a B bundle-dir
+    
+    mkdir invisible-dir
+    SetFile -a V invisible-dir
+        
+    touch hidden-extension.txt
+    SetFile -a E hidden-extension.txt
+    
+    touch system-file
+    SetFile -a S system-file
+    
+    # Use every flag possible (except lock)
+    touch mucho-flags-file
+    SetFile -a ABCDEIMNSTVZ mucho-flags-file
+    
+    # All possible on a dir
+    touch mucho-flags-dir
+    SetFile -a CDEIVZ mucho-flags-dir
+}
+
+compare () {
+    test "`GetFileInfo -P -a $1`" = "`GetFileInfo -P -a $2`" \
+    && test "`GetFileInfo -P -t $1`" = "`GetFileInfo -P -t $2`" \
+    && test "`GetFileInfo -P -c $1`" = "`GetFileInfo -P -c $2`" \
+    && test "`GetFileInfo -P -m $1`" = "`GetFileInfo -P -m $2`"
+}
+
+verify () {
+    cd $1
+    
+    test "`GetFileInfo -t type-and-creator`" = '"TEXT"' \
+    && test "`GetFileInfo -c type-and-creator`" = '"MSWD"' \
+    && test "`GetFileInfo -ab bundle-dir`" = "1" \
+    && test "`GetFileInfo -av invisible-dir`" = "1" \
+    && test "`GetFileInfo -ae hidden-extension.txt`" = "1" \
+    && test "`GetFileInfo -as system-file`" = "1" \
+    && compare ./mucho-flags-file $2/mucho-flags-file \
+    && compare ./mucho-flags-dir $2/mucho-flags-dir
+}
+
+clean () {
+    true
+}

@@ -1,0 +1,73 @@
+#!/bin/sh
+
+max_priority () {
+    echo $Exhaustive
+}
+
+create () {
+    cd $1
+    set -e
+    
+    # Nope, can't do it
+    # sudo mknod device-with-acl c 3 3
+    # chmod +a "adm allow read" device-with-acl
+
+    # A big fat test with lots of metadata
+    echo "gotta boogie" > many-metadata
+    xattr-util w user.big_time "so much larger than life" many-metadata
+    xattr-util w user.big_time2 "so much larger than life" many-metadata
+    xattr-util w user.big_time3 "so much larger than life" many-metadata
+    chmod 604 many-metadata
+    setfacl -m u:adm:r-- many-metadata
+    setfacl -m u:nobody:r-- many-metadata
+    sudo chown adm:adm many-metadata
+    
+}
+
+compare-xattrs () {
+    test -e $1 && \
+        test -e $2 && \
+        test "`xattr-util l $1`" = "`xattr-util l $2`" \
+        || return 1
+    for a in `xattr-util l $1`; do
+        test "`xattr-util r $a $1`" = "`xattr-util r $a $2`" || return 1
+    done
+}
+
+compare-acls () {
+    test "`getfacl $1 | tail +3`" = "`getfacl $2 | tail +3`"
+}
+
+compare-stats () {
+    test -e $1
+    test -e $2
+    test "`/usr/local/bin/stat --format='%u:%g:%a' $1`" = "`/usr/local/bin/stat --format='%u:%g:%a' $2`"
+}
+
+compare-inodes () {
+    test "`/usr/local/bin/stat --format=\"%i\" $1`" = "`/usr/local/bin/stat --format=\"%i\" $2`"
+}
+
+verify () {
+    cd $1
+    
+    begin-subtests
+    
+    test -e ./many-metadata \
+        && cmp ./many-metadata $2/many-metadata \
+        && compare-xattrs ./many-metadata $2/many-metadata \
+        && compare-acls ./many-metadata $2/many-metadata \
+        && compare-stats ./many-metadata $2/many-metadata
+    x3=$?
+    subtest "lots of metadata" $x3
+    
+    alltrue $x3
+}
+
+clean () {
+    true
+}
+
+compare () {
+    true
+}

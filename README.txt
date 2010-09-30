@@ -31,7 +31,7 @@ Installation & Usage
 ====================
 
 "Installation" is simple
-1. run "make OSFLAGS=LINUX|MACOS"
+1. run "make" OSFLAGS=LINUX|MACOS|SUN
 2. there's no step 2.
 
 To be clear, you do NOT install backup bouncer, you simply run it from the place

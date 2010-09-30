@@ -1,0 +1,29 @@
+#!/bin/sh
+max_priority () {
+    echo $Exhaustive
+}
+
+create () {
+    cd $1
+    set -e
+    
+    sudo mknod devzero c 3 3
+    sudo mknod devvn0 b 1 0
+}
+
+compare () {
+    test "`ls -la $1 | tail +4`" = "`ls -la $2 | tail +4`"
+}
+
+verify () {
+    cd $1
+    
+    test -c ./devzero \
+    && compare ./devzero $2/devzero \
+    && test -b ./devvn0 \
+    && compare ./devvn0 $2/devvn0
+}
+
+clean () {
+    true
+}

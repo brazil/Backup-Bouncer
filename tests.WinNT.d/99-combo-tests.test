@@ -1,0 +1,70 @@
+#!/bin/sh
+
+max_priority () {
+    echo $Exhaustive
+}
+
+create () {
+    cd $1
+    set -e
+    
+    # Nope, can't do it
+    # sudo mknod device-with-acl c 3 3
+    # chmod +a "games allow read" device-with-acl
+
+    # A big fat test with lots of metadata
+    echo "gotta boogie" > many-metadata
+    echo "so much larger than life" > many-metadata:big_time
+    echo "so much larger than life" > many-metadata:big_time2
+    echo "so much larger than life" > many-metadatabig_time3
+    chmod 604 many-metadata
+    icacls many-metadata /grant hky:F /Q
+    icacls many-metadata /grant Administrator:W /Q
+    chown hky many-metadata
+    
+}
+
+compare-xattrs () {
+    test -e $1 && \
+        test -e $2 && \
+        test "`xattr-util.exe l $1`" = "`xattr-util.exe l $2`" \
+        || return 1
+    for a in `xattr-util.exe l $1`; do
+        test "`xattr-util.exe r $a $1`" = "`xattr-util.exe r $a $2`" || return 1
+    done
+    return 0
+}
+
+compare-acls () {
+    test "`icacls $1 /Q`" = "`icacls $2 /Q`"
+}
+
+compare-stats () {
+    test -e $1
+    test -e $2
+    test "`stat --format='%u:%g:%a' $1`" = "`stat --format='%u:%g:%a' $2`"
+}
+
+verify () {
+    cd $1
+    
+    begin-subtests
+    
+    test -e ./many-metadata \
+        && cmp ./many-metadata $2/many-metadata \
+        && compare-xattrs ./many-metadata $2/many-metadata \
+        && compare-acls ./many-metadata $2/many-metadata \
+        && compare-stats ./many-metadata $2/many-metadata
+    x3=$?
+    subtest "lots of metadata" $x3
+    
+    alltrue $x3
+}
+
+clean () {
+    true
+}
+
+compare () {
+    true
+}

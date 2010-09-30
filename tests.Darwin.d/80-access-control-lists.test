@@ -1,0 +1,55 @@
+#!/bin/sh
+
+max_priority () {
+    echo $Important
+}
+
+create () {
+    cd $1
+    set -e
+    
+    touch acl-test
+    chmod +a "www allow read" acl-test
+    chmod +a "nobody allow read" acl-test
+    
+    mkdir acl-test-dir
+    chmod +a "www allow read" acl-test-dir
+    chmod +a "nobody allow read" acl-test-dir
+    
+    # Want these to be different from the symlink's target so we know
+    # we're getting the right thing.
+    #
+    # Ok, symlinks can't have acls
+    # ln -s ./acl-test acl-test-symlink
+    # chmod +a "nobody allow read" acl-test-symlink
+    # chmod +a "sshd allow read" acl-test-symlink
+}
+
+compare () {
+    test "`ls -Plde $1 | tail -n +2`" = "`ls -Plde $2 | tail -n +2`"
+}
+
+
+verify () {
+    cd $1
+    
+    begin-subtests
+    
+    compare $2/acl-test ./acl-test
+    t1=$?
+    subtest "on files" $t1
+    
+    compare $2/acl-test-dir ./acl-test-dir
+    t2=$?
+    subtest "on dirs" $t2
+    
+    # compare $2/acl-test-symlink ./acl-test-symlink
+    # t3=$?
+    # subtest "on symlinks" $t3
+    
+    alltrue $t1 $t2
+}
+
+clean () {
+    true
+}

@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# There are no tools included with OS X to manipulate extended attributes from
+# the command line, so I wrote my own.
+
+max_priority () {
+    echo $Important
+}
+
+create () {
+    cd $1
+    set -e
+    
+    touch xattr-test
+    xattr-util w user.message 'hello world' xattr-test
+    xattr-util w user.this.that 'the other' xattr-test
+    
+    mkdir dir-with-xattrs
+    xattr-util w user.mamma.mia 'How about a nice pizza pie?' dir-with-xattrs
+    
+    ln -s ./xattr-test symlink-with-xattrs
+    xattr-util w user.good.grief 'yes, you can put these on symlinks too' \
+            symlink-with-xattrs
+    
+}
+
+compare () {
+    test -e $1 && \
+        test -e $2 && \
+        test "`xattr-util l $1`" = "`xattr-util l $2`" \
+        || return 1
+    for a in `xattr-util l $1`; do
+        test "`xattr-util r $a $1`" = "`xattr-util r $a $2`" || return 1
+    done
+    return 0
+}
+
+verify () {
+    cd $1
+    set +e
+    
+    begin-subtests
+    
+    compare ./xattr-test $2/xattr-test
+    x1=$?
+    subtest "on files" $x1
+    
+    compare ./dir-with-xattrs $2/dir-with-xattrs
+    x2=$?
+    subtest "on directories" $x2
+    
+    test_priority=$Exhaustive
+    compare ./symlink-with-xattrs $2/symlink-with-xattrs
+    x3=$?
+    subtest "on symlinks" $x3
+        
+    alltrue $x1 $x2 $x3
+}
+
+clean () {
+    true
+}

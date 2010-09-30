@@ -2,6 +2,8 @@
 
 #set -x
 
+PathBash="/bin"
+
 scriptdir="`dirname $0`"
 cd "$scriptdir"
 export PATH="`pwd`/util:/Developer/Tools:$PATH:."
@@ -44,8 +46,9 @@ usage () {
                      $name copy -c 10-rsync-apple /Volumes/Src /Volumes/Dst
     
     Meanings of different verbs:
-        $name create-vol volname
-                Create and mount a disk image suitable for testing.
+        $name create-vol volname [Linux][ext4 | lustre]
+                Create and mount a disk image suitable for testing. On Linux,
+                you can choose the File System used in the previous list.
 
         $name create [-t test]* dir
                 Populate dir with test files/directories.
@@ -82,6 +85,8 @@ usage () {
         # That filled /Volumes/Dst with a subdirectory for each copier.
         # To verify the results from a single copy again:
         $name verify -d /Volumes/Src /Volumes/Dst/10-rsync-apple
+	# On Windows
+	E:\Sources\backup-bouncer-0.2.0.win>c:\tools\bin\bash.exe bbouncer verify -d e:\Sources\Volumes\Src e:\Sources\Volumes\Dst
 
     3. Or maybe you want to test a GUI copier
         $name create-vol SDDst
@@ -131,14 +136,47 @@ create-vol () {
        else
            mkdir /Volumes
        fi
-       dd if=/dev/zero of=/Volumes/$1.ext3 count=256 bs=1024k > /dev/null
-       mkfs.ext3 -F /Volumes/$1.ext3 > /dev/null
+       if [ "$OSName" = "Linux" ]; then
+           if [ "$2" = "" ]; then
+               LinuxFsName="ext3"
+           else
+               LinuxFsName=$2
+           fi
+           if [ "$LinuxFsName" != "lustre" ]; then
+             dd if=/dev/zero of=/Volumes/$1.$LinuxFsName count=256 bs=1024k > /dev/null
+             mkfs.$LinuxFsName -F /Volumes/$1.$LinuxFsName > /dev/null
+           fi
+       else if [ "$OSName" = "SunOS" ]; then
+           dd if=/dev/zero of=/Volumes/$1.ufs count=256 bs=1024k > /dev/null
+           lofi_out=`lofiadm -a /Volumes/$1.ufs`
+           newfs $lofi_out
+       else if [ "$OSName" = "WinNT" ]; then
+         echo Use NTFS for "$OSName"
+       else
+         echo unknowed "$OSName"
+       fi
+       fi
+       fi
        if [ -e /Volumes/$1 ]; then
            touch /Volumes/$1
        else
            mkdir /Volumes/$1
        fi
-       mount -o loop -o user_xattr,acl /Volumes/$1.ext3 /Volumes/$1 
+       if [ "$OSName" = "Linux" ]; then
+           if [ "$LinuxFsName" = "lustre" ]; then
+             if [ -e /Volumes/$1 ]; then
+                 touch /Volumes/$1
+             else
+                 mkdir /Volumes/$1
+             fi
+           else
+             mount -o loop -o user_xattr,acl /Volumes/$1.$LinuxFsName /Volumes/$1 
+           fi
+        else
+           if [ "$OSName" = "SunOS" ]; then
+               mount -F ufs $lofi_out /Volumes/$1 
+           fi
+       fi
     fi
     touch /Volumes/$1/bbouncer-vol
 }
@@ -159,7 +197,7 @@ clean () {
         tnice=$t
         printf "Cleaning: %${printWidth}s\n" "$tnice"
         if [ -d "$1/$t" ]; then
-            /bin/bash util/test-runner tests.$OSName.d/$t.test clean $1/$t || true
+            $PathBash/bash util/test-runner tests.$OSName.d/$t.test clean $1/$t || true
             sudo rm -Rf "$1/$t" || true
         fi
     done
@@ -172,7 +210,7 @@ create () {
         tnice=$t
         printf "Creating: %${printWidth}s ... " "$tnice"
         mkdir $1/$t
-        /bin/bash util/test-runner tests.$OSName.d/$t.test create $1/$t \
+        $PathBash/bash util/test-runner tests.$OSName.d/$t.test create $1/$t \
             && echo ok \
             || echo FAIL
     done
@@ -202,7 +240,7 @@ verify () {
             continue
         fi
         #printf "Verifying: %${printWidth}s ... " "$tnice"
-        /bin/bash util/test-runner tests.$OSName.d/$t.test verify Verifying $tnice $dst/$t $src/$t 
+        $PathBash/bash util/test-runner tests.$OSName.d/$t.test verify Verifying $tnice $dst/$t $src/$t 
     done
 }
 
@@ -211,7 +249,7 @@ compare () {
     for t in $tests; do
         tnice=${t:3}
         #printf "Comparing: %${printWidth}s ... " "$tnice"
-        /bin/bash util/test-runner tests.$OSName.d/$t.test compare Comparing $tnice $1 $2
+        $PathBash/bash util/test-runner tests.$OSName.d/$t.test compare Comparing $tnice $1 $2
     done
 }
 
@@ -247,7 +285,7 @@ copy () {
         cnice=${c:3}
         printf "Copying with: %${printWidth}s ... " "$cnice"
         mkdir $dst/$c
-        /bin/bash util/copy-runner copiers.$OSName.d/$c.cp $src $dst/$c
+        $PathBash/bash util/copy-runner copiers.$OSName.d/$c.cp $src $dst/$c
         code=$?
         echo $code > $dst/$c/exit-code
         # Make sure the volume can be cleaned
@@ -291,6 +329,12 @@ shift
 # Check for flags
 tests=''
 copiers=''
+
+if [[ $OSName == CYGWIN* ]]; then
+  OSName='WinNT'
+  export PathBash="c:\tools\bin\\"
+fi
+
 while [ "${1:0:1}" = "-" ]; do
     opt=$1
     shift
@@ -332,7 +376,7 @@ done
 
 case $verb in
     create|create-vol|clean)
-        $verb $1
+        $verb $1 $2
     ;;
     verify|copy|compare)
         [ "$#" -lt "2" ] && usage

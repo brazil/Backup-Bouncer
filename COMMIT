@@ -1,0 +1,9 @@
+-rwxr-xr-x 1 hky  vannes 10168 2009-11-23 14:45 bbouncer*
+-rw-r--r-- 1 hky  vannes  4909 2009-11-23 14:51 README.txt
+
+tryphon.root(227) [dev->backup-bouncer-0.2.0] ll util/
+-rw-r--r-- 1 hky  vannes   116 2009-10-29 17:50 Makefile
+-rw-r--r-- 1 hky  vannes  3463 2009-10-29 18:07 xattr-util.c
+
+tryphon.root(227) [dev->backup-bouncer-0.2.0] ll test.Darwin.d/
+tests.Darwin.d/99-combo-tests.test

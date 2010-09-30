@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# I'm not sure what the semantics of most of these are.  From man chflags:
+#     The flags are specified as an octal number or a comma separated list of
+#     keywords.  The following keywords are currently defined:
+#
+#           opaque  set the opaque flag (owner or super-user only)
+#           nodump  set the nodump flag (owner or super-user only)
+#           uappnd  set the user append-only flag (owner or super-user only)
+#           uchg    set the user immutable flag (owner or super-user only)
+#           uunlnk  set the user undeletable flag (owner or super-user only)
+#
+#           arch    set the archived flag (super-user only)
+#           sappnd  set the system append-only flag (super-user only)
+#           schg    set the system immutable flag (super-user only)
+#           sunlnk  set the system undeletable flag (super-user only)
+#           
+#           archived, sappend, schange, simmutable, uappend, uchange,
+#                   uimmutable, sunlink, uunlink
+#                   aliases for the above
+#
+# Note to self: If you set the schg (system immutable) flag, then you
+# can't un-set it without rebooting into single-user mode!  I think the
+# same also applies to the other system-level flags.  Yes, I learned this
+# the hard way...
+#   http://www.freebsd.org/cgi/man.cgi?query=chflags&sektion=2
+#
+# Also, the uunlnk (and sunlnk) flags don't seem to work.
+
+max_priority () {
+    echo $Exhaustive
+}
+
+create () {
+    cd $1
+    set -e
+    
+    mkdir dir-with-flags
+    chflags uappnd,uchg,nodump,opaque dir-with-flags
+ 
+    touch file-with-flags
+    chflags uappnd,uchg,nodump,opaque file-with-flags
+
+    mkdir dir-plus-with-flags
+    mkdir dir-plus-with-flags/sub-dir-with-flags
+    touch dir-plus-with-flags/sub-file-with-flags
+    chflags uappnd,uchg,nodump,opaque dir-plus-with-flags/sub-file-with-flags
+    chflags uappnd,uchg,nodump,opaque dir-plus-with-flags/sub-dir-with-flags
+    chflags uappnd,uchg,nodump,opaque dir-plus-with-flags
+
+}
+
+compare () {
+    #set -x
+    test "`/usr/bin/stat -f '%f' $1`" = "`/usr/bin/stat -f '%f' $2`"
+}
+
+verify () {
+    cd $1
+    compare ./dir-with-flags $2/dir-with-flags \
+    && compare ./file-with-flags $2/file-with-flags \
+    && compare ./dir-plus-with-flags $2/dir-plus-with-flags \
+    && compare ./dir-plus-with-flags/sub-dir-with-flags $2/dir-plus-with-flags/sub-dir-with-flags \
+    && compare ./dir-plus-with-flags/sub-file-with-flags $2/dir-plus-with-flags/sub-file-with-flags
+}
+
+clean () {
+    # We use sudo here because the files may have ended up owned by root after
+    # the copy (as in xar)
+    sudo chflags 0 dir-with-flags
+    sudo chflags 0 file-with-flags
+}
